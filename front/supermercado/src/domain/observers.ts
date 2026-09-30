@@ -1,6 +1,8 @@
 import type { Produto } from './categorias';
 import { diasParaVencer } from '../utils';
 
+export const DIAS_ALERTA_VENCIMENTO = 3;
+
 export type TipoAlerta = 'REPOSICAO' | 'QUEIMA';
 
 export interface Alerta {
@@ -53,6 +55,14 @@ export class AlertaCenter {
     if (this.#alertas.delete(`${tipo}:${produtoId}`)) this.#emitir();
   }
 
+  removerDoProduto(produtoId: number): void {
+    let mudou = false;
+    for (const [key, a] of this.#alertas) {
+      if (a.produtoId === produtoId) mudou = this.#alertas.delete(key) || mudou;
+    }
+    if (mudou) this.#emitir();
+  }
+
   subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
     return () => {
@@ -87,7 +97,7 @@ export class ReposicaoObserver implements Observer<Produto> {
 export class VencimentoObserver implements Observer<Produto> {
   constructor(
     private readonly central: AlertaCenter,
-    private readonly diasLimite = 3,
+    private readonly diasLimite = DIAS_ALERTA_VENCIMENTO,
   ) {}
 
   update(p: Produto): void {

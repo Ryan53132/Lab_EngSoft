@@ -3,8 +3,12 @@ import {
   CalculadoraPreco, MelhorPreco, DescontoVencimento, DescontoQuantidade,
   type EstrategiaPreco, type ResultadoPreco,
 } from '../domain/precos';
-import { EstoqueSubject, AlertaCenter, ReposicaoObserver, VencimentoObserver } from '../domain/observers';
-import { createRepository, type ProdutoRepository } from '../hooks/repositories';
+import {
+  EstoqueSubject, AlertaCenter, ReposicaoObserver, VencimentoObserver, DIAS_ALERTA_VENCIMENTO,
+} from '../domain/observers';
+import type { Filtros, Situacao } from '../domain/filtros';
+import { diasParaVencer, normalizar } from '../utils';
+import { createRepository, type ProdutoRepository } from './repositories';
 
 // Facade: única porta de entrada da UI para produtos, preços e alertas
 export class LojaFacade {
@@ -33,6 +37,17 @@ export class LojaFacade {
     return salvo;
   }
 
+  async editarProduto(id: number, { categoria, ...dados }: NovoProduto): Promise<Produto> {
+    const atualizado = await this.repo.atualizar(criarProduto(categoria, { ...dados, id }));
+    this.estoque.notify(atualizado);
+    return atualizado;
+  }
+
+  async removerProduto(produto: Produto): Promise<void> {
+    await this.repo.remover(produto.id);
+    this.alertas.removerDoProduto(produto.id);
+  }
+
   async movimentarEstoque(produto: Produto, delta: number): Promise<Produto> {
     const nova = produto.quantidade + delta;
     if (nova < 0) throw new Error('Estoque insuficiente.');
@@ -47,6 +62,29 @@ export class LojaFacade {
 
   trocarRegraPreco(estrategia: EstrategiaPreco): void {
     this.calculadora.setEstrategia(estrategia);
+  }
+
+  filtrarProdutos(produtos: Produto[], { busca, categoria, situacao }: Filtros): Produto[] {
+    const termo = normalizar(busca.trim());
+    return produtos.filter(
+      (p) =>
+        normalizar(p.nome).includes(termo) &&
+        (categoria === 'todas' || p.categoria === categoria) &&
+        this.#casaSituacao(p, situacao),
+    );
+  }
+
+  #casaSituacao(p: Produto, situacao: Situacao): boolean {
+    switch (situacao) {
+      case 'vencimento':
+        return diasParaVencer(p.dataValidade) < DIAS_ALERTA_VENCIMENTO;
+      case 'promocao':
+        return this.calcularPreco(p).preco < p.preco;
+      case 'reposicao':
+        return p.quantidade <= p.estoqueMinimo;
+      default:
+        return true;
+    }
   }
 }
 

@@ -25,3 +25,6 @@ export const formatData = (iso: string): string => parseData(iso).toLocaleDateSt
 
 export const mensagemErro = (e: unknown): string =>
   e instanceof Error ? e.message : 'Erro inesperado.';
+
+export const normalizar = (s: string): string =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();

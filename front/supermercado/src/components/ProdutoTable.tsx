@@ -4,6 +4,7 @@ import '@inovua/reactdatagrid-community/index.css';
 import type { TypeColumn } from '@inovua/reactdatagrid-community/types';
 import { loja } from '../services/LojaFacade';
 import type { Produto } from '../domain/categorias';
+import { DIAS_ALERTA_VENCIMENTO } from '../domain/observers';
 import { diasParaVencer, formatBRL, formatData, mensagemErro } from '../utils';
 
 interface CelulaProps {
@@ -46,29 +47,36 @@ function VendaCell({ produto, onChange }: { produto: Produto; onChange: () => vo
         />
         <button onClick={() => void mover(-1)}>Vender</button>
         <button className="sec" onClick={() => void mover(1)}>Repor</button>
-        <span className={preco < produto.preco ? 'etiqueta promo' : 'etiqueta'}>{formatBRL(preco)}</span>
       </div>
-      <small className={erro ? 'erro' : ''}>
-        {erro ?? `${regra} · total ${formatBRL(preco * qtd)}`}
-      </small>
+      <div className="preco-linha">
+        <span className={preco < produto.preco ? 'etiqueta promo' : 'etiqueta'}>{formatBRL(preco)}</span>
+        <small className={erro ? 'erro' : ''}>{erro ?? `${regra} · total ${formatBRL(preco * qtd)}`}</small>
+      </div>
     </div>
   );
 }
 
-const criarColunas = (onChange: () => void): TypeColumn[] => [
-  { name: 'nome', header: 'Produto', defaultFlex: 2, minWidth: 170 },
-  { name: 'categoria', header: 'Categoria', defaultFlex: 1, minWidth: 130 },
+interface Handlers {
+  onChange: () => void;
+  onEditar: (p: Produto) => void;
+  onExcluir: (p: Produto) => void;
+}
+
+const criarColunas = ({ onChange, onEditar, onExcluir }: Handlers): TypeColumn[] => [
+  { name: 'nome', header: 'Produto', defaultFlex: 2, minWidth: 120 },
+  { name: 'categoria', header: 'Categoria', defaultFlex: 1, minWidth: 115 },
   {
     name: 'dataValidade',
     header: 'Validade',
-    minWidth: 120,
+    defaultFlex: 1,
+    minWidth: 100,
     render: ({ data }: { data: Produto }) => {
       const dias = diasParaVencer(data.dataValidade);
       return (
         <Celula
           principal={formatData(data.dataValidade)}
           secundario={dias < 0 ? 'vencido' : `${dias} dia(s)`}
-          critico={dias < 3}
+          critico={dias < DIAS_ALERTA_VENCIMENTO}
         />
       );
     },
@@ -77,7 +85,8 @@ const criarColunas = (onChange: () => void): TypeColumn[] => [
     name: 'quantidade',
     header: 'Estoque',
     type: 'number',
-    minWidth: 100,
+    defaultFlex: 1,
+    minWidth: 85,
     render: ({ data }: { data: Produto }) => (
       <Celula
         principal={String(data.quantidade)}
@@ -90,7 +99,8 @@ const criarColunas = (onChange: () => void): TypeColumn[] => [
     name: 'preco',
     header: 'Preço',
     type: 'number',
-    minWidth: 100,
+    defaultFlex: 1,
+    minWidth: 90,
     render: ({ value }: { value: number }) => formatBRL(value),
   },
   {
@@ -98,26 +108,43 @@ const criarColunas = (onChange: () => void): TypeColumn[] => [
     header: 'Venda',
     sortable: false,
     defaultFlex: 2,
-    minWidth: 340,
+    minWidth: 240,
     render: ({ data }: { data: Produto }) => <VendaCell produto={data} onChange={onChange} />,
+  },
+  {
+    name: 'acoes',
+    header: 'Ações',
+    sortable: false,
+    minWidth: 150,
+    render: ({ data }: { data: Produto }) => (
+      <div className="acoes">
+        <button className="sec" onClick={() => onEditar(data)}>Editar</button>
+        <button className="sec excluir" onClick={() => onExcluir(data)}>Excluir</button>
+      </div>
+    ),
   },
 ];
 
-export default function ProdutoTable({ produtos, onChange }: { produtos: Produto[]; onChange: () => void }) {
-  const colunas = useMemo(() => criarColunas(onChange), [onChange]);
+interface ProdutoTableProps extends Handlers {
+  produtos: Produto[];
+  textoVazio: string;
+}
+
+export default function ProdutoTable({ produtos, textoVazio, onChange, onEditar, onExcluir }: ProdutoTableProps) {
+  const colunas = useMemo(
+    () => criarColunas({ onChange, onEditar, onExcluir }),
+    [onChange, onEditar, onExcluir],
+  );
 
   return (
-    <section className="painel">
-      <h2>Produtos</h2>
-      <ReactDataGrid
-        idProperty="id"
-        columns={colunas}
-        dataSource={produtos}
-        rowHeight={64}
-        theme="default-light"
-        style={{ minHeight: 420 }}
-        emptyText="Nenhum produto cadastrado. Use o formulário para adicionar o primeiro."
-      />
-    </section>
+    <ReactDataGrid
+      idProperty="id"
+      columns={colunas}
+      dataSource={produtos}
+      rowHeight={72}
+      theme="default-light"
+      style={{ minHeight: 420 }}
+      emptyText={textoVazio}
+    />
   );
 }

@@ -5,7 +5,9 @@ import { daquiADias } from '../utils';
 export interface ProdutoRepository {
   listar(): Promise<Produto[]>;
   criar(produto: Produto): Promise<Produto>;
+  atualizar(produto: Produto): Promise<Produto>;
   atualizarEstoque(id: number, quantidade: number): Promise<Produto>;
+  remover(id: number): Promise<void>;
 }
 
 async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -46,11 +48,26 @@ class MockProdutoRepository implements ProdutoRepository {
     return salvo;
   }
 
+  async atualizar(produto: Produto): Promise<Produto> {
+    const i = this.#indice(produto.id);
+    this.#dados[i] = produto;
+    return produto;
+  }
+
   async atualizarEstoque(id: number, quantidade: number): Promise<Produto> {
-    const i = this.#dados.findIndex((p) => p.id === id);
-    if (i < 0) throw new Error('Produto não encontrado.');
+    const i = this.#indice(id);
     this.#dados[i] = this.#dados[i].comQuantidade(quantidade);
     return this.#dados[i];
+  }
+
+  async remover(id: number): Promise<void> {
+    this.#dados.splice(this.#indice(id), 1);
+  }
+
+  #indice(id: number): number {
+    const i = this.#dados.findIndex((p) => p.id === id);
+    if (i < 0) throw new Error('Produto não encontrado.');
+    return i;
   }
 }
 
@@ -69,7 +86,7 @@ interface CategoriaDTO {
   nome: string;
 }
 
-// Contrato esperado do back: GET/POST /produtos, PATCH /produtos/{id}, GET /categorias.
+// Contrato esperado do back: GET/POST /produtos, PUT/PATCH/DELETE /produtos/{id}, GET /categorias.
 // data_validade deve vir do lote mais próximo do vencimento (no schema fica em lotes).
 class ApiProdutoRepository implements ProdutoRepository {
   #categorias: CategoriaDTO[] | null = null;
@@ -95,8 +112,8 @@ class ApiProdutoRepository implements ProdutoRepository {
     return (await http<ProdutoDTO[]>('/produtos')).map(this.#toDominio);
   }
 
-  async criar(p: Produto): Promise<Produto> {
-    const body = {
+  async #toBody(p: Produto) {
+    return {
       nome: p.nome,
       categoria_id: await this.#categoriaId(p.categoria),
       fornecedor_id: FORNECEDOR_PADRAO,
@@ -105,7 +122,20 @@ class ApiProdutoRepository implements ProdutoRepository {
       estoque_minimo: p.estoqueMinimo,
       data_validade: p.dataValidade,
     };
-    return this.#toDominio(await http<ProdutoDTO>('/produtos', { method: 'POST', body: JSON.stringify(body) }));
+  }
+
+  async criar(p: Produto): Promise<Produto> {
+    const body = JSON.stringify(await this.#toBody(p));
+    return this.#toDominio(await http<ProdutoDTO>('/produtos', { method: 'POST', body }));
+  }
+
+  async atualizar(p: Produto): Promise<Produto> {
+    const body = JSON.stringify(await this.#toBody(p));
+    return this.#toDominio(await http<ProdutoDTO>(`/produtos/${p.id}`, { method: 'PUT', body }));
+  }
+
+  async remover(id: number): Promise<void> {
+    await http<null>(`/produtos/${id}`, { method: 'DELETE' });
   }
 
   async atualizarEstoque(id: number, quantidade: number): Promise<Produto> {
