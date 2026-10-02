@@ -1,12 +1,18 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Home from './pages/home';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import ProdutosPage from './pages/ProdutosPage';
+import './App.css';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <div className="app">
+      <Sidebar />
+      <main>
         <Routes>
-          <Route path="/" element={<Home/>} />
+          <Route path="/produtos" element={<ProdutosPage />} />
+          <Route path="*" element={<Navigate to="/produtos" replace />} />
         </Routes>
-    </BrowserRouter>
+      </main>
+    </div>
   );
 }

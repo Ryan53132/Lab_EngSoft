@@ -4,7 +4,6 @@ from DataBaseSchema import Base, engine, get_db
 
 app = FastAPI()
 
-# Opcional: Cria as tabelas e triggers no banco assim que a API sobe
 @app.on_event("startup")
 def startup_db():
     # Cria todas as tabelas mapeadas pelo Base no Postgres
