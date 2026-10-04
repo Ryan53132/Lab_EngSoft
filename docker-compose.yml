@@ -46,7 +46,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
-      - VITE_USE_MOCK=true
+      - VITE_USE_MOCK=false
     depends_on:
       - back
     networks:

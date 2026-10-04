@@ -2,9 +2,18 @@ from enum import Enum as PyEnum
 import os
 from datetime import datetime, timezone
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Numeric, 
-    ForeignKey, DateTime, Date, Enum, event, update, select, insert, UniqueConstraint,
-    DDL, event
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Numeric,
+    ForeignKey,
+    DateTime,
+    Date,
+    Enum,
+    UniqueConstraint,
+    event,
+    DDL,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -54,9 +63,9 @@ class Produto(Base):
 
     categoria = relationship("Categoria", back_populates="produtos")
     fornecedor = relationship("Fornecedor", back_populates="produtos")
-    lotes = relationship("Lote", back_populates="produto")
-    movimentacoes = relationship("Movimentacao", back_populates="produto")
-    alertas_estoque = relationship("AlertaEstoque", back_populates="produto")
+    lotes = relationship("Lote", back_populates="produto", cascade="all, delete-orphan")
+    movimentacoes = relationship("Movimentacao", back_populates="produto", cascade="all, delete-orphan")
+    alertas_estoque = relationship("AlertaEstoque", back_populates="produto", cascade="all, delete-orphan")
 
 class Lote(Base):
     __tablename__ = 'lotes'
@@ -75,7 +84,7 @@ class Lote(Base):
     )
 
     produto = relationship("Produto", back_populates="lotes")
-    movimentacoes = relationship("Movimentacao", back_populates="lotes")
+    movimentacoes = relationship("Movimentacao", back_populates="lote", cascade="all, delete-orphan")
 
 class Movimentacao(Base):
     __tablename__ = 'movimentacoes'
@@ -119,6 +128,7 @@ class AuditoriaMovimentacoes(Base):
     data_acao = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+# Triggers PostgreSQL são instalados pelo Main.py após todas as tabelas serem criadas.
 # 1. Cria a função PL/pgSQL que verifica se o estoque ficou abaixo do mínimo
 criar_funcao_alerta_estoque = DDL(
     """
