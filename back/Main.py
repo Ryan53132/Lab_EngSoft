@@ -257,6 +257,10 @@ def startup_db():
     _seed_defaults()
     _instalar_triggers()
 
+@app.on_event("startup")
+def startup_db():
+    # Cria todas as tabelas mapeadas pelo Base no Postgres
+    Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def read_root():

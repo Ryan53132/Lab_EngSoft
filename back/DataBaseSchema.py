@@ -2,8 +2,18 @@ from enum import Enum as PyEnum
 import os
 from datetime import datetime, timezone
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Numeric,
-    ForeignKey, DateTime, Date, Enum, UniqueConstraint
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Numeric,
+    ForeignKey,
+    DateTime,
+    Date,
+    Enum,
+    UniqueConstraint,
+    event,
+    DDL,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -119,6 +129,96 @@ class AuditoriaMovimentacoes(Base):
 
 
 # Triggers PostgreSQL são instalados pelo Main.py após todas as tabelas serem criadas.
+# 1. Cria a função PL/pgSQL que verifica se o estoque ficou abaixo do mínimo
+criar_funcao_alerta_estoque = DDL(
+    """
+    CREATE OR REPLACE FUNCTION fn_verifica_estoque_baixo()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        -- Se a quantidade atual ficou menor ou igual ao estoque mínimo e antes não era
+        IF NEW.quantidade_estoque <= NEW.estoque_minimo AND OLD.quantidade_estoque > NEW.estoque_minimo THEN
+            INSERT INTO alertas_estoque (
+                produto_id,
+                quantidade_no_momento,
+                estoque_minimo,
+                resolvido,
+                created_at
+            )
+            VALUES (
+                NEW.id,
+                NEW.quantidade_estoque,
+                NEW.estoque_minimo,
+                0, -- 0 para não resolvido / pendente
+                NOW()
+            );
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """
+)
+
+# 2. Cria o trigger associado à tabela produtos
+criar_trigger_alerta_estoque = DDL(
+    """
+    DROP TRIGGER IF EXISTS trg_verifica_estoque_baixo ON produtos;
+    CREATE TRIGGER trg_verifica_estoque_baixo
+    AFTER UPDATE OF quantidade_estoque ON produtos
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_verifica_estoque_baixo();
+    """
+)
+
+# Registra os eventos na tabela Produto
+event.listen(Produto.__table__, 'after_create', criar_funcao_alerta_estoque)
+event.listen(Produto.__table__, 'after_create', criar_trigger_alerta_estoque)
+
+# 1. Cria a função para a auditoria
+criar_funcao_auditoria = DDL(
+    """
+    CREATE OR REPLACE FUNCTION fn_audita_movimentacao()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        INSERT INTO auditoria_movimentacoes (
+            movimentacao_id,
+            produto_id,
+            tipo,
+            quantidade_anterior,
+            quantidade_nova,
+            usuario,
+            acao,
+            data_acao
+        )
+        VALUES (
+            NEW.id,
+            NEW.produto_id,
+            NEW.tipo::text, -- Converte o Enum do PG para texto, se necessário
+            0, -- Ajuste conforme a lógica de estoque anterior do seu sistema
+            NEW.quantidade,
+            CURRENT_USER,
+            'INSERT',
+            NOW()
+        );
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """
+)
+
+# 2. Cria o trigger associado à tabela movimentacoes
+criar_trigger_auditoria = DDL(
+    """
+    DROP TRIGGER IF EXISTS trg_audita_movimentacao ON movimentacoes;
+    CREATE TRIGGER trg_audita_movimentacao
+    AFTER INSERT ON movimentacoes
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_audita_movimentacao();
+    """
+)
+
+# Registra os eventos na tabela Movimentacao
+event.listen(Movimentacao.__table__, 'after_create', criar_funcao_auditoria)
+event.listen(Movimentacao.__table__, 'after_create', criar_trigger_auditoria)
 
 #Conexao
 DATABASE_URL = os.getenv(
