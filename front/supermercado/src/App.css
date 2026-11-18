@@ -80,6 +80,10 @@ button.sec.excluir:hover { background: #fbecea; }
 .preco-linha small { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etiqueta { padding: 2px 8px; border: 1px solid var(--linha); border-radius: 4px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .etiqueta.promo { background: var(--etiqueta); border-color: #c9a800; }
+.tabela-logs { overflow-x: auto; }
+.tabela-logs table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.tabela-logs th, .tabela-logs td { padding: 10px 12px; border-bottom: 1px solid var(--linha); text-align: left; white-space: nowrap; }
+.tabela-logs th { background: var(--pastel); color: var(--verde); }
 
 @media (max-width: 800px) {
   .app { grid-template-columns: 1fr; }
