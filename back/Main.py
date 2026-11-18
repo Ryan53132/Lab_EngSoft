@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from DataBaseSchema import (
     AlertaEstoque,
+    AuditoriaMovimentacoes,
     Categoria,
     Fornecedor,
     Lote,
@@ -98,6 +99,18 @@ class AlertaOut(BaseModel):
     estoque_minimo: int
     resolvido: bool
     created_at: datetime
+
+
+class LogOut(BaseModel):
+    movimentacao_id: int
+    produto_id: int
+    produto_nome: Optional[str] = None
+    tipo: Optional[str] = None
+    quantidade_anterior: Optional[int] = None
+    quantidade_nova: Optional[int] = None
+    usuario: Optional[str] = None
+    acao: Optional[str] = None
+    data_acao: datetime
 
 
 def _mais_proximo_vencimento(produto: Produto) -> Optional[date]:
@@ -484,4 +497,27 @@ def listar_alertas_estoque(db: Session = Depends(get_db)):
             created_at=a.created_at,
         )
         for a, nome in rows
+    ]
+
+
+@app.get("/logs", response_model=list[LogOut])
+def listar_logs(db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(AuditoriaMovimentacoes, Produto.nome)
+        .outerjoin(Produto, Produto.id == AuditoriaMovimentacoes.produto_id)
+        .order_by(AuditoriaMovimentacoes.data_acao.desc())
+    ).all()
+    return [
+        LogOut(
+            movimentacao_id=log.movimentacao_id,
+            produto_id=log.produto_id,
+            produto_nome=nome,
+            tipo=log.tipo,
+            quantidade_anterior=log.quantidade_anterior,
+            quantidade_nova=log.quantidade_nova,
+            usuario=log.usuario,
+            acao=log.acao,
+            data_acao=log.data_acao,
+        )
+        for log, nome in rows
     ]
