@@ -52,6 +52,42 @@ class CategoriaCreate(BaseModel):
     descricao: Optional[str] = None
 
 
+class FornecedorOut(BaseModel):
+    id: int
+    nome: str
+    contato: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class FornecedorCreate(BaseModel):
+    nome: str = Field(min_length=1, max_length=150)
+    contato: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class LoteOut(BaseModel):
+    id: int
+    produto_id: int
+    produto_nome: str
+    numero_lote: str
+    quantidade: int
+    data_fabricacao: Optional[date] = None
+    data_validade: date
+
+
+class LoteCreate(BaseModel):
+    produto_id: int = Field(gt=0)
+    numero_lote: str = Field(min_length=1, max_length=50)
+    quantidade: int = Field(ge=0)
+    data_fabricacao: Optional[date] = None
+    data_validade: date
+
+
 class ProdutoCreate(BaseModel):
     nome: str = Field(min_length=1, max_length=150)
     categoria_id: int = Field(gt=0)
