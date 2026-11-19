@@ -341,6 +341,87 @@ def criar_categoria(payload: CategoriaCreate, db: Session = Depends(get_db)):
     return categoria
 
 
+@app.get("/fornecedores", response_model=list[FornecedorOut])
+def listar_fornecedores(db: Session = Depends(get_db)):
+    return db.execute(select(Fornecedor).order_by(Fornecedor.nome)).scalars().all()
+
+
+@app.post("/fornecedores", response_model=FornecedorOut, status_code=status.HTTP_201_CREATED)
+def criar_fornecedor(payload: FornecedorCreate, db: Session = Depends(get_db)):
+    nome = payload.nome.strip()
+    existente = db.execute(
+        select(Fornecedor).where(func.lower(Fornecedor.nome) == nome.lower())
+    ).scalar_one_or_none()
+    if existente:
+        raise HTTPException(status_code=409, detail="Fornecedor já cadastrado.")
+    fornecedor = Fornecedor(
+        nome=nome,
+        contato=payload.contato,
+        telefone=payload.telefone,
+        email=payload.email,
+    )
+    db.add(fornecedor)
+    db.commit()
+    db.refresh(fornecedor)
+    return fornecedor
+
+
+@app.get("/lotes", response_model=list[LoteOut])
+def listar_lotes(db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(Lote, Produto.nome)
+        .join(Produto, Produto.id == Lote.produto_id)
+        .order_by(Lote.data_validade)
+    ).all()
+    return [
+        LoteOut(
+            id=lote.id,
+            produto_id=lote.produto_id,
+            produto_nome=nome,
+            numero_lote=lote.numero_lote,
+            quantidade=lote.quantidade,
+            data_fabricacao=lote.data_fabricacao,
+            data_validade=lote.data_validade,
+        )
+        for lote, nome in rows
+    ]
+
+
+@app.post("/lotes", response_model=LoteOut, status_code=status.HTTP_201_CREATED)
+def criar_lote(payload: LoteCreate, db: Session = Depends(get_db)):
+    produto = db.get(Produto, payload.produto_id)
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto não encontrado.")
+    numero_lote = payload.numero_lote.strip()
+    existente = db.execute(
+        select(Lote).where(
+            Lote.produto_id == payload.produto_id,
+            Lote.numero_lote == numero_lote,
+        )
+    ).scalar_one_or_none()
+    if existente:
+        raise HTTPException(status_code=409, detail="Número de lote já cadastrado para este produto.")
+    lote = Lote(
+        produto_id=payload.produto_id,
+        numero_lote=numero_lote,
+        quantidade=payload.quantidade,
+        data_fabricacao=payload.data_fabricacao,
+        data_validade=payload.data_validade,
+    )
+    db.add(lote)
+    db.commit()
+    db.refresh(lote)
+    return LoteOut(
+        id=lote.id,
+        produto_id=lote.produto_id,
+        produto_nome=produto.nome,
+        numero_lote=lote.numero_lote,
+        quantidade=lote.quantidade,
+        data_fabricacao=lote.data_fabricacao,
+        data_validade=lote.data_validade,
+    )
+
+
 @app.get("/produtos", response_model=list[ProdutoOut])
 def listar_produtos(db: Session = Depends(get_db)):
     produtos = db.execute(
