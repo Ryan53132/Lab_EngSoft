@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ProdutosPage from './pages/ProdutosPage';
 import LogPage from './pages/LogPage';
@@ -23,9 +23,15 @@ export default function App() {
 }
 
 function LayoutAutenticado() {
+  const navigate = useNavigate();
+  const sair = () => {
+    sessionStorage.removeItem('supermercado:usuario');
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar onSair={sair} />
       <main>
         <Routes>
           <Route path="/produtos" element={<ProdutosPage />} />
