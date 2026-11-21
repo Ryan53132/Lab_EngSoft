@@ -47,7 +47,7 @@ O professor também estabeleceu dois Design Patterns obrigatórios: Observer e F
 | 2 | US-02 | 🔴 ALTA | Como Funcionário, quero acessar uma área de alertas que me avisam sobre estados específicos de certos produtos, como produto próximo da validade ou em baixo estoque. | 1 | ✔️ |
 | 3 | US-03 | 🟡 BAIXA | Como Funcionário, quero que o sistema calcule automaticamente promoções de produtos perto do vencimento. | 1 | ✔️ |
 | 4 | US-04 | 🟠 MÉDIA | Como Funcionário, quero possuir um histórico completo de auditagem de movimentações de produtos no estoque. | 2 | Não concluída |
-| 5 | US-05 | 🟠 MÉDIA | Como Funcionário, quero cadastrar informações secundárias sobre os produtos, como fornecedores, lotes e novas categorias. | 2 | Não concluída |
+| 5 | US-05 | 🟠 MÉDIA | Como Funcionário, quero cadastrar informações secundárias sobre os produtos, como fornecedores, lotes e novas categorias. | 2 | ✔️ |
 
 ---
 
@@ -85,6 +85,8 @@ docker compose up -d --build
 Acompanhe a subida com `docker compose ps`.
 
 Você poderá acessar a aplicação através de: `http://localhost:5173/produtos`
+
+A tela de cadastros secundários está disponível em: `http://localhost:5173/cadastros`
 
 ### 3. Parar os serviços
 

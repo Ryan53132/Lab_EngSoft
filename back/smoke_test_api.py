@@ -15,6 +15,10 @@ SCHEMA = (ROOT / "DataBaseSchema.py").read_text(encoding="utf-8")
 expected = [
     ("GET /categorias", r'@app\.get\("/categorias"'),
     ("POST /categorias", r'@app\.post\("/categorias"'),
+    ("GET /fornecedores", r'@app\.get\("/fornecedores"'),
+    ("POST /fornecedores", r'@app\.post\("/fornecedores"'),
+    ("GET /lotes", r'@app\.get\("/lotes"'),
+    ("POST /lotes", r'@app\.post\("/lotes"'),
     ("GET /produtos", r'@app\.get\("/produtos"'),
     ("GET /produtos/{id}", r'@app\.get\("/produtos/\{produto_id\}"'),
     ("POST /produtos", r'@app\.post\("/produtos"'),
