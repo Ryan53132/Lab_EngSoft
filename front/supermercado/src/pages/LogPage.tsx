@@ -9,7 +9,6 @@ interface Log {
   quantidade_anterior: number | null;
   quantidade_nova: number | null;
   usuario: string | null;
-  acao: string | null;
   data_acao: string;
 }
 
@@ -52,7 +51,6 @@ export default function LogPage() {
                   <th>Data</th>
                   <th>Produto</th>
                   <th>Tipo</th>
-                  <th>Ação</th>
                   <th>Anterior</th>
                   <th>Nova</th>
                   <th>Usuário</th>
@@ -64,7 +62,6 @@ export default function LogPage() {
                     <td>{new Date(log.data_acao).toLocaleString('pt-BR')}</td>
                     <td>{log.produto_nome ?? `Produto ${log.produto_id}`}</td>
                     <td>{log.tipo ?? '-'}</td>
-                    <td>{log.acao ?? '-'}</td>
                     <td>{log.quantidade_anterior ?? '-'}</td>
                     <td>{log.quantidade_nova ?? '-'}</td>
                     <td>{log.usuario ?? '-'}</td>
