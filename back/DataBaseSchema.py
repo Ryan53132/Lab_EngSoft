@@ -72,6 +72,7 @@ class Lote(Base):
 
     id = Column(Integer, primary_key=True)
     produto_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    fornecedor_id = Column(Integer, ForeignKey('fornecedores.id'), nullable=False)
     numero_lote = Column(String(50), nullable=False)
     quantidade = Column(Integer, nullable=False)
     data_fabricacao = Column(Date, nullable=True)
@@ -84,6 +85,7 @@ class Lote(Base):
     )
 
     produto = relationship("Produto", back_populates="lotes")
+    fornecedor = relationship("Fornecedor")
     movimentacoes = relationship("Movimentacao", back_populates="lote", cascade="all, delete-orphan")
 
 class Movimentacao(Base):

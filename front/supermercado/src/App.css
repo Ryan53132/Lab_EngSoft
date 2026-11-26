@@ -24,6 +24,12 @@ body { margin: 0; background: var(--fundo); }
 .sidebar a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: var(--tinta); text-decoration: none; font-weight: 500; }
 .sidebar a:hover { background: var(--pastel-forte); }
 .sidebar a.active { background: var(--pastel-forte); color: var(--verde); font-weight: 600; }
+.cadastros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; }
+.cadastros-grid > .painel { min-width: 0; }
+.cadastros-grid input, .cadastros-grid select { width: 100%; min-width: 0; max-width: 100%; }
+.lista { display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; margin: 16px 0 0; border-top: 1px solid var(--linha); list-style: none; }
+.lista li { display: flex; justify-content: space-between; gap: 8px; font-size: .9rem; }
+.lista small { color: var(--suave); }
 
 main { padding: 40px 48px 64px; max-width: 1240px; width: 100%; min-width: 0; }
 header h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
@@ -41,7 +47,7 @@ h2 { margin: 0 0 14px; font-size: 1.1rem; }
 .modal::backdrop { background: rgba(20, 40, 30, 0.4); }
 .modal-corpo { padding: 24px; }
 .modal-corpo p { margin: 0 0 16px; }
-.linha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--suave); }
 input, select { padding: 8px 10px; border: 1px solid var(--linha); border-radius: 6px; font: inherit; color: var(--tinta); background: #fff; }
 button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--verde); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
@@ -91,4 +97,5 @@ button.sec.excluir:hover { background: #fbecea; }
   .marca { padding-bottom: 10px; }
   .sidebar nav { flex-direction: row; }
   main { padding: 24px 16px 48px; }
+  .cadastros-grid { grid-template-columns: minmax(0, 1fr); }
 }
