@@ -2,6 +2,11 @@ import { NavLink } from 'react-router-dom';
 
 const itens = [
   {
+    to: '/cadastros',
+    label: 'Cadastros',
+    icone: <span aria-hidden="true">+</span>,
+  },
+  {
     to: '/produtos',
     label: 'Produtos',
     icone: (

@@ -48,6 +48,8 @@ O professor também estabeleceu dois Design Patterns obrigatórios: Observer e F
 | 3 | US-03 | 🟡 BAIXA | Como Funcionário, quero que o sistema calcule automaticamente promoções de produtos perto do vencimento. | 1 | ✔️ |
 | 4 | US-04 | 🟠 MÉDIA | Como Funcionário, quero possuir um histórico completo de auditagem de movimentações de produtos no estoque. | 2 | Não concluída |
 | 5 | US-05 | 🟠 MÉDIA | Como Funcionário, quero cadastrar informações secundárias sobre os produtos, como fornecedores, lotes e novas categorias. | 2 | Não concluída |
+| 6 | US-06 | 🟠 MÉDIA | Como Administrador, quero cadastrar os funcionários que terão acesso ao sistema. | 2 | Não concluída |
+
 
 ---
 
@@ -72,8 +74,7 @@ O professor também estabeleceu dois Design Patterns obrigatórios: Observer e F
 ### 1. Clonar o projeto
 
 ```bash
-git clone https://github.com/Equipe-SUL/Stentio.git
-cd Stentio
+git clone https://github.com/Ryan53132/Lab_EngSoft
 ```
 
 ### 2. Rodando o Docker
@@ -84,9 +85,7 @@ docker compose up -d --build
 
 Acompanhe a subida com `docker compose ps`.
 
-Você poderá acessar a aplicação através de: `http://localhost:5173/produtos`
-
-A tela de Login está disponível em: `http://localhost:5173/login`
+Você poderá acessar a aplicação através de: `http://localhost:5173`
 
 ### 3. Parar os serviços
 
