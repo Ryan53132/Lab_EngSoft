@@ -85,9 +85,7 @@ docker compose up -d --build
 
 Acompanhe a subida com `docker compose ps`.
 
-Você poderá acessar a aplicação através de: `http://localhost:5173/produtos`
-
-A tela de cadastros secundários está disponível em: `http://localhost:5173/cadastros`
+Você poderá acessar a aplicação através de: `http://localhost:5173`
 
 ### 3. Parar os serviços
 

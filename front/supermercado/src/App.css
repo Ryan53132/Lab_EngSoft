@@ -14,7 +14,9 @@
   color: var(--tinta);
 }
 * { box-sizing: border-box; }
+html, body, #root { width: 100%; min-height: 100%; }
 body { margin: 0; background: var(--fundo); }
+#root { min-height: 100vh; min-height: 100svh; }
 
 .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
 
@@ -24,6 +26,7 @@ body { margin: 0; background: var(--fundo); }
 .sidebar a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: var(--tinta); text-decoration: none; font-weight: 500; }
 .sidebar a:hover { background: var(--pastel-forte); }
 .sidebar a.active { background: var(--pastel-forte); color: var(--verde); font-weight: 600; }
+.sair { width: 100%; margin-top: 24px; background: transparent; border: 1px solid var(--pastel-forte); }
 .cadastros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; }
 .cadastros-grid > .painel { min-width: 0; }
 .cadastros-grid input, .cadastros-grid select { width: 100%; min-width: 0; max-width: 100%; }
@@ -31,7 +34,8 @@ body { margin: 0; background: var(--fundo); }
 .lista li { display: flex; justify-content: space-between; gap: 8px; font-size: .9rem; }
 .lista small { color: var(--suave); }
 
-main { padding: 40px 48px 64px; max-width: 1240px; width: 100%; min-width: 0; }
+/* O limite de largura e o espaçamento pertencem apenas ao conteúdo autenticado. */
+.app > main { padding: 40px 48px 64px; max-width: 1240px; width: 100%; min-width: 0; }
 header h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
 header p { margin: 4px 0 24px; color: var(--suave); }
 h2 { margin: 0 0 14px; font-size: 1.1rem; }
@@ -90,12 +94,26 @@ button.sec.excluir:hover { background: #fbecea; }
 .tabela-logs table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .tabela-logs th, .tabela-logs td { padding: 10px 12px; border-bottom: 1px solid var(--linha); text-align: left; white-space: nowrap; }
 .tabela-logs th { background: var(--pastel); color: var(--verde); }
+.login {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: 0;
+  padding: 24px;
+  background: var(--pastel);
+}
+.login-card { width: min(420px, 100%); padding: 32px; border-radius: 14px; background: #fff; box-shadow: var(--sombra); }
+.marca-login { color: var(--verde); font-size: 1.25rem; font-weight: 700; }
+.login-card h1 { margin: 32px 0 4px; }
+.login-card > p { margin: 0 0 24px; color: var(--suave); }
 
 @media (max-width: 800px) {
   .app { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; padding: 14px 16px; }
   .marca { padding-bottom: 10px; }
   .sidebar nav { flex-direction: row; }
-  main { padding: 24px 16px 48px; }
-  .cadastros-grid { grid-template-columns: minmax(0, 1fr); }
+  .app > main { padding: 24px 16px 48px; }
 }

@@ -28,7 +28,7 @@ const itens = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onSair }: { onSair: () => void }) {
   return (
     <aside className="sidebar">
       <div className="marca">Supermercado</div>
@@ -40,6 +40,7 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <button className="sair" onClick={onSair}>Sair</button>
     </aside>
   );
 }
