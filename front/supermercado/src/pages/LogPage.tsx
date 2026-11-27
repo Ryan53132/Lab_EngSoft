@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { API_URL, USE_MOCK } from '../config';
+import { USE_MOCK } from '../config';
+import { apiRequest } from '../services/AuthService';
 
 interface Log {
   movimentacao_id: number;
@@ -22,9 +23,7 @@ export default function LogPage() {
 
     const carregar = async () => {
       try {
-        const resposta = await fetch(`${API_URL}/logs`);
-        if (!resposta.ok) throw new Error(`Erro ${resposta.status} ao carregar os logs`);
-        setLogs(await resposta.json() as Log[]);
+        setLogs(await apiRequest<Log[]>('/logs'));
       } catch (erro) {
         setErro(erro instanceof Error ? erro.message : 'Erro ao carregar os logs');
       }

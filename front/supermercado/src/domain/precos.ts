@@ -1,4 +1,4 @@
-import type { Produto } from './categorias';
+import type { Categoria, Produto } from './categorias';
 import { diasParaVencer } from '../utils';
 
 export interface ResultadoPreco {
@@ -8,6 +8,28 @@ export interface ResultadoPreco {
 
 export interface EstrategiaPreco {
   calcular(produto: Produto, quantidade: number): ResultadoPreco;
+}
+
+export type EscopoPromocao = 'produto' | 'categoria' | 'todos';
+
+export interface PromocaoManual {
+  id: string;
+  escopo: EscopoPromocao;
+  produtoId?: number;
+  produtoNome?: string;
+  categoria?: Categoria;
+  percentual: number;
+  titulo: string;
+  criadaEm: string;
+}
+
+export interface NovaPromocaoManual {
+  escopo: EscopoPromocao;
+  produtoId?: number;
+  produtoNome?: string;
+  categoria?: Categoria;
+  percentual: number;
+  titulo?: string;
 }
 
 const arredondar = (n: number): number => Math.round(n * 100) / 100;
@@ -45,6 +67,33 @@ export class DescontoQuantidade implements EstrategiaPreco {
     return {
       preco: arredondar(produto.preco * (1 - this.percentual)),
       regra: `Quantidade −${this.percentual * 100}%`,
+    };
+  }
+}
+
+export class DescontoManual implements EstrategiaPreco {
+  #promocoes: PromocaoManual[] = [];
+
+  definirPromocoes(promocoes: PromocaoManual[]): void {
+    this.#promocoes = [...promocoes];
+  }
+
+  calcular(produto: Produto): ResultadoPreco {
+    const aplicaveis = this.#promocoes.filter((promo) => {
+      if (promo.escopo === 'produto') return promo.produtoId === produto.id;
+      if (promo.escopo === 'categoria') return promo.categoria === produto.categoria;
+      return promo.escopo === 'todos';
+    });
+
+    if (aplicaveis.length === 0) return normal(produto);
+
+    const melhor = aplicaveis.reduce((atual, cand) =>
+      cand.percentual > atual.percentual ? cand : atual,
+    );
+
+    return {
+      preco: arredondar(produto.preco * (1 - melhor.percentual / 100)),
+      regra: `${melhor.titulo} −${melhor.percentual}%`,
     };
   }
 }

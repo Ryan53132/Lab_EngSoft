@@ -3,6 +3,7 @@ import ReactDataGrid from '@inovua/reactdatagrid-community';
 import '@inovua/reactdatagrid-community/index.css';
 import type { TypeColumn } from '@inovua/reactdatagrid-community/types';
 import { loja } from '../services/LojaFacade';
+import { usePromocoesManuais } from '../hooks/useLoja';
 import type { Produto } from '../domain/categorias';
 import { DIAS_ALERTA_VENCIMENTO } from '../domain/observers';
 import { diasParaVencer, formatBRL, formatData, mensagemErro } from '../utils';
@@ -21,6 +22,7 @@ const Celula = ({ principal, secundario, critico }: CelulaProps) => (
 );
 
 function VendaCell({ produto, onChange }: { produto: Produto; onChange: () => void }) {
+  usePromocoesManuais();
   const [qtd, setQtd] = useState(1);
   const [erro, setErro] = useState<string | null>(null);
   const { preco, regra } = loja.calcularPreco(produto, qtd);

@@ -19,6 +19,39 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 
+class Cargo(PyEnum):
+    ADMIN = "ADMIN"
+    FUNCIONARIO = "FUNCIONARIO"
+
+class Funcionario(Base):
+    __tablename__ = "funcionarios"
+
+    id = Column(Integer, primary_key=True)
+
+    nome = Column(String(150), nullable=False)
+
+    email = Column(
+        String(150),
+        nullable=False,
+        unique=True
+    )
+
+    telefone = Column(String(11), nullable=True)
+
+    cpf = Column(
+        String(11),
+        nullable=False,
+        unique=True
+    )
+
+    cargo = Column(
+        Enum(Cargo, name="cargo_funcionario"),
+        nullable=False,
+        default=Cargo.FUNCIONARIO
+    )
+
+    senha_hash = Column(String(255), nullable=False)
+
 class TipoMovimentacao(PyEnum):
     ENTRADA = "ENTRADA"
     SAIDA = "SAIDA"

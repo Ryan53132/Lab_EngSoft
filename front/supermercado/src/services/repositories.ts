@@ -1,6 +1,7 @@
-import { API_URL, USE_MOCK, FORNECEDOR_PADRAO } from '../config';
+import { USE_MOCK, FORNECEDOR_PADRAO } from '../config';
 import { criarProduto, type Categoria, type Produto } from '../domain/categorias';
 import { daquiADias } from '../utils';
+import { apiRequest } from './AuthService';
 
 export interface ProdutoRepository {
   listar(): Promise<Produto[]>;
@@ -11,12 +12,7 @@ export interface ProdutoRepository {
 }
 
 async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`Erro ${res.status} ao acessar ${path}`);
-  return (res.status === 204 ? null : await res.json()) as T;
+  return apiRequest<T>(path, options);
 }
 
 class MockProdutoRepository implements ProdutoRepository {
