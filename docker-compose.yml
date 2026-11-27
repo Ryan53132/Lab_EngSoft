@@ -29,9 +29,20 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://meu_usuario:minha_senha@db:5432/meu_banco
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret-key-change-in-production}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=30
+
+      # Administrador inicial
+      - ADMIN_NAME=${ADMIN_NAME:-Administrador}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@mercado.com}
+      - ADMIN_CPF=${ADMIN_CPF:-12345678900}
+      - ADMIN_PHONE=${ADMIN_PHONE:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-SenhaForte123!}
+
     depends_on:
       db:
-        condition: service_healthy 
+        condition: service_healthy
     networks:
       - app-network
 

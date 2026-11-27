@@ -25,3 +25,6 @@ export function useProdutos() {
 
 export const useAlertas = () =>
   useSyncExternalStore(loja.alertas.subscribe, loja.alertas.getSnapshot);
+
+export const usePromocoesManuais = () =>
+  useSyncExternalStore(loja.subscribePromocoes, loja.getPromocoesSnapshot);

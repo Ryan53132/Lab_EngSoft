@@ -1,21 +1,27 @@
 from datetime import date, datetime
 from decimal import Decimal
 import os
+import re
 from typing import Optional
-
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, joinedload
+from Security import get_usuario_atual, verificar_admin, hash_senha
+from Auth import router as auth_router
+from Funcionario import router as funcionario_router
 
 from DataBaseSchema import (
     AlertaEstoque,
+    AuditoriaMovimentacoes,
+    Cargo,
     Categoria,
     Fornecedor,
     Lote,
     Movimentacao,
     Produto,
+    Funcionario,
     SessionLocal,
     TipoMovimentacao,
     Base,
@@ -24,6 +30,9 @@ from DataBaseSchema import (
 )
 
 app = FastAPI(title="Supermercado API", version="1.0.0")
+
+app.include_router(auth_router)
+app.include_router(funcionario_router)
 
 # Permite o frontend Vite local consumir a API.
 app.add_middleware(
@@ -49,6 +58,45 @@ class CategoriaOut(BaseModel):
 class CategoriaCreate(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
     descricao: Optional[str] = None
+
+
+class FornecedorOut(BaseModel):
+    id: int
+    nome: str
+    contato: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class FornecedorCreate(BaseModel):
+    nome: str = Field(min_length=1, max_length=150)
+    contato: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class LoteOut(BaseModel):
+    id: int
+    produto_id: int
+    produto_nome: str
+    fornecedor_id: int
+    fornecedor_nome: str
+    numero_lote: str
+    quantidade: int
+    data_fabricacao: Optional[date] = None
+    data_validade: date
+
+
+class LoteCreate(BaseModel):
+    produto_id: int = Field(gt=0)
+    fornecedor_id: int = Field(gt=0)
+    numero_lote: str = Field(min_length=1, max_length=50)
+    quantidade: int = Field(ge=0)
+    data_fabricacao: Optional[date] = None
+    data_validade: date
 
 
 class ProdutoCreate(BaseModel):
@@ -100,6 +148,18 @@ class AlertaOut(BaseModel):
     created_at: datetime
 
 
+class LogOut(BaseModel):
+    movimentacao_id: int
+    produto_id: int
+    produto_nome: Optional[str] = None
+    tipo: Optional[str] = None
+    quantidade_anterior: Optional[int] = None
+    quantidade_nova: Optional[int] = None
+    usuario: Optional[str] = None
+    acao: Optional[str] = None
+    data_acao: datetime
+
+
 def _mais_proximo_vencimento(produto: Produto) -> Optional[date]:
     hoje = date.today()
     datas = [l.data_validade for l in produto.lotes if l.quantidade > 0]
@@ -143,9 +203,12 @@ def _get_fornecedor(db: Session, fornecedor_id: int) -> Fornecedor:
     return fornecedor
 
 
-def _criar_lote(db: Session, produto_id: int, quantidade: int, validade: date) -> Lote:
+def _criar_lote(
+    db: Session, produto_id: int, fornecedor_id: int, quantidade: int, validade: date
+) -> Lote:
     lote = Lote(
         produto_id=produto_id,
+        fornecedor_id=fornecedor_id,
         numero_lote=f"API-{produto_id}-{date.today().strftime('%Y%m%d')}",
         quantidade=quantidade,
         data_validade=validade,
@@ -169,7 +232,7 @@ def _sincronizar_lote_principal(
         principal.data_validade = validade
         principal.quantidade = quantidade
     else:
-        _criar_lote(db, produto.id, quantidade, validade)
+        _criar_lote(db, produto.id, produto.fornecedor_id, quantidade, validade)
 
 
 def _instalar_triggers():
@@ -209,7 +272,8 @@ def _instalar_triggers():
                  quantidade_nova, usuario, acao, data_acao)
             VALUES
                 (NEW.id, NEW.produto_id, NEW.tipo::text, 0, NEW.quantidade,
-                 CURRENT_USER, 'INSERT', NOW());
+                 COALESCE(NULLIF(current_setting('app.current_user', true), ''), CURRENT_USER),
+                 'INSERT', NOW());
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
@@ -247,6 +311,18 @@ def _seed_defaults():
                 )
             )
         db.commit()
+        db.execute(
+            text(
+                """
+                SELECT setval(
+                    pg_get_serial_sequence('fornecedores', 'id'),
+                    COALESCE((SELECT MAX(id) FROM fornecedores), 1),
+                    true
+                )
+                """
+            )
+        )
+        db.commit()
     finally:
         db.close()
 
@@ -254,13 +330,46 @@ def _seed_defaults():
 @app.on_event("startup")
 def startup_db():
     Base.metadata.create_all(bind=engine)
-    _seed_defaults()
-    _instalar_triggers()
 
-@app.on_event("startup")
-def startup_db():
-    # Cria todas as tabelas mapeadas pelo Base no Postgres
-    Base.metadata.create_all(bind=engine)
+    _seed_defaults()
+    _migrar_fornecedor_dos_lotes()
+    _instalar_triggers()
+    _criar_admin_inicial()
+
+def _migrar_fornecedor_dos_lotes():
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "ALTER TABLE lotes ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER"
+        )
+        conn.exec_driver_sql(
+            """
+            UPDATE lotes AS lote
+            SET fornecedor_id = produto.fornecedor_id
+            FROM produtos AS produto
+            WHERE lote.produto_id = produto.id
+              AND lote.fornecedor_id IS NULL
+            """
+        )
+        conn.exec_driver_sql(
+            "ALTER TABLE lotes ALTER COLUMN fornecedor_id SET NOT NULL"
+        )
+        conn.exec_driver_sql(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'lotes_fornecedor_id_fkey'
+                      AND conrelid = 'lotes'::regclass
+                ) THEN
+                    ALTER TABLE lotes
+                    ADD CONSTRAINT lotes_fornecedor_id_fkey
+                    FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
+                END IF;
+            END;
+            $$
+            """
+        )
 
 @app.get("/")
 def read_root():
@@ -272,13 +381,28 @@ def teste():
     return {"message": "Rota de teste funcionando!"}
 
 
+def _definir_usuario_auditoria(db: Session, usuario: Funcionario) -> None:
+    identificacao = f"{usuario.nome} ({usuario.email})"[:100]
+    db.execute(
+        text("SELECT set_config('app.current_user', :usuario, true)"),
+        {"usuario": identificacao},
+    )
+
+
 @app.get("/categorias", response_model=list[CategoriaOut])
-def listar_categorias(db: Session = Depends(get_db)):
+def listar_categorias(
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     return db.execute(select(Categoria).order_by(Categoria.nome)).scalars().all()
 
 
 @app.post("/categorias", response_model=CategoriaOut, status_code=status.HTTP_201_CREATED)
-def criar_categoria(payload: CategoriaCreate, db: Session = Depends(get_db)):
+def criar_categoria(
+    payload: CategoriaCreate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     nome = payload.nome.strip()
     existente = db.execute(
         select(Categoria).where(func.lower(Categoria.nome) == nome.lower())
@@ -292,8 +416,167 @@ def criar_categoria(payload: CategoriaCreate, db: Session = Depends(get_db)):
     return categoria
 
 
+@app.delete("/categorias/{categoria_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remover_categoria(
+    categoria_id: int,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    categoria = db.get(Categoria, categoria_id)
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada.")
+    if db.execute(
+        select(Produto.id).where(Produto.categoria_id == categoria_id).limit(1)
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir uma categoria que possui produtos.",
+        )
+    db.delete(categoria)
+    db.commit()
+    return None
+
+
+@app.get("/fornecedores", response_model=list[FornecedorOut])
+def listar_fornecedores(
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    return db.execute(select(Fornecedor).order_by(Fornecedor.nome)).scalars().all()
+
+
+@app.post("/fornecedores", response_model=FornecedorOut, status_code=status.HTTP_201_CREATED)
+def criar_fornecedor(
+    payload: FornecedorCreate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    nome = payload.nome.strip()
+    existente = db.execute(
+        select(Fornecedor).where(func.lower(Fornecedor.nome) == nome.lower())
+    ).scalar_one_or_none()
+    if existente:
+        raise HTTPException(status_code=409, detail="Fornecedor já cadastrado.")
+    fornecedor = Fornecedor(
+        nome=nome,
+        contato=payload.contato,
+        telefone=payload.telefone,
+        email=payload.email,
+    )
+    db.add(fornecedor)
+    db.commit()
+    db.refresh(fornecedor)
+    return fornecedor
+
+
+@app.delete("/fornecedores/{fornecedor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remover_fornecedor(
+    fornecedor_id: int,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    fornecedor = db.get(Fornecedor, fornecedor_id)
+    if not fornecedor:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado.")
+    if fornecedor_id == 1:
+        raise HTTPException(
+            status_code=409,
+            detail="O fornecedor padrão não pode ser excluído.",
+        )
+    if db.execute(
+        select(Produto.id).where(Produto.fornecedor_id == fornecedor_id).limit(1)
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir um fornecedor vinculado a produtos.",
+        )
+    if db.execute(
+        select(Lote.id).where(Lote.fornecedor_id == fornecedor_id).limit(1)
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir um fornecedor vinculado a lotes.",
+        )
+    db.delete(fornecedor)
+    db.commit()
+    return None
+
+
+@app.get("/lotes", response_model=list[LoteOut])
+def listar_lotes(
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    rows = db.execute(
+        select(Lote, Produto.nome, Fornecedor.nome)
+        .join(Produto, Produto.id == Lote.produto_id)
+        .join(Fornecedor, Fornecedor.id == Lote.fornecedor_id)
+        .order_by(Lote.data_validade)
+    ).all()
+    return [
+        LoteOut(
+            id=lote.id,
+            produto_id=lote.produto_id,
+            produto_nome=nome,
+            fornecedor_id=lote.fornecedor_id,
+            fornecedor_nome=fornecedor_nome,
+            numero_lote=lote.numero_lote,
+            quantidade=lote.quantidade,
+            data_fabricacao=lote.data_fabricacao,
+            data_validade=lote.data_validade,
+        )
+        for lote, nome, fornecedor_nome in rows
+    ]
+
+
+@app.post("/lotes", response_model=LoteOut, status_code=status.HTTP_201_CREATED)
+def criar_lote(
+    payload: LoteCreate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
+    produto = db.get(Produto, payload.produto_id)
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto não encontrado.")
+    fornecedor = _get_fornecedor(db, payload.fornecedor_id)
+    numero_lote = payload.numero_lote.strip()
+    existente = db.execute(
+        select(Lote).where(
+            Lote.produto_id == payload.produto_id,
+            Lote.numero_lote == numero_lote,
+        )
+    ).scalar_one_or_none()
+    if existente:
+        raise HTTPException(status_code=409, detail="Número de lote já cadastrado para este produto.")
+    lote = Lote(
+        produto_id=payload.produto_id,
+        fornecedor_id=fornecedor.id,
+        numero_lote=numero_lote,
+        quantidade=payload.quantidade,
+        data_fabricacao=payload.data_fabricacao,
+        data_validade=payload.data_validade,
+    )
+    db.add(lote)
+    db.commit()
+    db.refresh(lote)
+    return LoteOut(
+        id=lote.id,
+        produto_id=lote.produto_id,
+        produto_nome=produto.nome,
+        fornecedor_id=lote.fornecedor_id,
+        fornecedor_nome=fornecedor.nome,
+        numero_lote=lote.numero_lote,
+        quantidade=lote.quantidade,
+        data_fabricacao=lote.data_fabricacao,
+        data_validade=lote.data_validade,
+    )
+
+
 @app.get("/produtos", response_model=list[ProdutoOut])
-def listar_produtos(db: Session = Depends(get_db)):
+def listar_produtos(
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     produtos = db.execute(
         select(Produto)
         .options(
@@ -306,7 +589,11 @@ def listar_produtos(db: Session = Depends(get_db)):
 
 
 @app.get("/produtos/{produto_id}", response_model=ProdutoOut)
-def obter_produto(produto_id: int, db: Session = Depends(get_db)):
+def obter_produto(
+    produto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     produto = db.execute(
         select(Produto)
         .options(joinedload(Produto.categoria), joinedload(Produto.lotes))
@@ -318,7 +605,11 @@ def obter_produto(produto_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/produtos", response_model=ProdutoOut, status_code=status.HTTP_201_CREATED)
-def criar_produto(payload: ProdutoCreate, db: Session = Depends(get_db)):
+def criar_produto(
+    payload: ProdutoCreate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     categoria = _get_categoria(db, payload.categoria_id)
     fornecedor = _get_fornecedor(db, payload.fornecedor_id)
 
@@ -336,6 +627,7 @@ def criar_produto(payload: ProdutoCreate, db: Session = Depends(get_db)):
 
     lote = Lote(
         produto_id=produto.id,
+        fornecedor_id=fornecedor.id,
         numero_lote=f"API-{produto.id}-{date.today().strftime('%Y%m%d')}",
         quantidade=payload.quantidade_estoque,
         data_validade=payload.data_validade,
@@ -343,6 +635,7 @@ def criar_produto(payload: ProdutoCreate, db: Session = Depends(get_db)):
     db.add(lote)
 
     if payload.quantidade_estoque:
+        _definir_usuario_auditoria(db, usuario)
         db.add(
             Movimentacao(
                 produto_id=produto.id,
@@ -365,7 +658,12 @@ def criar_produto(payload: ProdutoCreate, db: Session = Depends(get_db)):
 
 
 @app.put("/produtos/{produto_id}", response_model=ProdutoOut)
-def atualizar_produto(produto_id: int, payload: ProdutoUpdate, db: Session = Depends(get_db)):
+def atualizar_produto(
+    produto_id: int,
+    payload: ProdutoUpdate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     produto = db.execute(
         select(Produto)
         .options(joinedload(Produto.categoria), joinedload(Produto.lotes))
@@ -390,6 +688,7 @@ def atualizar_produto(produto_id: int, payload: ProdutoUpdate, db: Session = Dep
         delta = payload.quantidade_estoque - quantidade_anterior
         tipo = TipoMovimentacao.ENTRADA if delta > 0 else TipoMovimentacao.SAIDA
         if delta:
+            _definir_usuario_auditoria(db, usuario)
             db.add(
                 Movimentacao(
                     produto=produto,
@@ -414,7 +713,10 @@ def atualizar_produto(produto_id: int, payload: ProdutoUpdate, db: Session = Dep
 
 @app.patch("/produtos/{produto_id}", response_model=ProdutoOut)
 def atualizar_estoque(
-    produto_id: int, payload: EstoqueUpdate, db: Session = Depends(get_db)
+    produto_id: int,
+    payload: EstoqueUpdate,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
 ):
     produto = db.execute(
         select(Produto)
@@ -436,6 +738,7 @@ def atualizar_estoque(
     if lotes:
         lotes[0].quantidade = nova
 
+    _definir_usuario_auditoria(db, usuario)
     db.add(
         Movimentacao(
             produto=produto,
@@ -456,7 +759,11 @@ def atualizar_estoque(
 
 
 @app.delete("/produtos/{produto_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remover_produto(produto_id: int, db: Session = Depends(get_db)):
+def remover_produto(
+    produto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     produto = db.get(Produto, produto_id)
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
@@ -466,7 +773,10 @@ def remover_produto(produto_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/alertas/estoque", response_model=list[AlertaOut])
-def listar_alertas_estoque(db: Session = Depends(get_db)):
+def listar_alertas_estoque(
+    db: Session = Depends(get_db),
+    usuario: Funcionario = Depends(get_usuario_atual),
+):
     rows = db.execute(
         select(AlertaEstoque, Produto.nome)
         .join(Produto, Produto.id == AlertaEstoque.produto_id)
@@ -484,4 +794,103 @@ def listar_alertas_estoque(db: Session = Depends(get_db)):
             created_at=a.created_at,
         )
         for a, nome in rows
+    ]
+
+def _criar_admin_inicial():
+    db = SessionLocal()
+
+    try:
+        # Verifica se já existe algum administrador
+        admin_existente = db.execute(
+            select(Funcionario).where(
+                Funcionario.cargo == Cargo.ADMIN
+            )
+        ).scalar_one_or_none()
+
+        if admin_existente:
+            print("Administrador inicial já cadastrado.")
+            return
+
+        # Recupera os dados das variáveis de ambiente
+        nome = os.getenv("ADMIN_NAME")
+        email = os.getenv("ADMIN_EMAIL")
+        cpf = os.getenv("ADMIN_CPF")
+        telefone = os.getenv("ADMIN_PHONE") or None
+        senha = os.getenv("ADMIN_PASSWORD")
+
+        # Verifica se as credenciais foram configuradas
+        if not all([nome, email, cpf, senha]):
+            raise RuntimeError(
+                "Credenciais do administrador inicial não configuradas."
+            )
+
+        email = email.strip().lower()
+        cpf = re.sub(r"\D", "", cpf)
+        if telefone:
+            telefone_digitos = re.sub(r"\D", "", telefone)
+            telefone = telefone_digitos[:11] if telefone_digitos else None
+
+        if len(cpf) != 11 or not cpf.isdigit():
+            raise RuntimeError(
+                "O CPF do administrador deve possuir 11 números."
+            )
+
+        # Verifica se email ou CPF já pertencem a outro funcionário
+        existente = db.execute(
+            select(Funcionario).where(
+                (Funcionario.email == email) |
+                (Funcionario.cpf == cpf)
+            )
+        ).scalar_one_or_none()
+
+        if existente:
+            raise RuntimeError(
+                "Email ou CPF já pertence a outro funcionário. "
+                "Não foi possível criar o administrador."
+            )
+
+        administrador = Funcionario(
+            nome=nome.strip(),
+            email=email,
+            cpf=cpf,
+            telefone=telefone,
+            cargo=Cargo.ADMIN,
+            senha_hash=hash_senha(senha)
+        )
+
+        db.add(administrador)
+        db.commit()
+
+        print("Administrador inicial criado com sucesso!")
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
+
+@app.get("/logs", response_model=list[LogOut])
+def listar_logs(
+    db: Session = Depends(get_db),
+    admin: Funcionario = Depends(verificar_admin)
+):
+    rows = db.execute(
+        select(AuditoriaMovimentacoes, Produto.nome)
+        .outerjoin(Produto, Produto.id == AuditoriaMovimentacoes.produto_id)
+        .order_by(AuditoriaMovimentacoes.data_acao.desc())
+    ).all()
+    return [
+        LogOut(
+            movimentacao_id=log.movimentacao_id,
+            produto_id=log.produto_id,
+            produto_nome=nome,
+            tipo=log.tipo,
+            quantidade_anterior=log.quantidade_anterior,
+            quantidade_nova=log.quantidade_nova,
+            usuario=log.usuario,
+            acao=log.acao,
+            data_acao=log.data_acao,
+        )
+        for log, nome in rows
     ]

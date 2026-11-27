@@ -19,6 +19,39 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 
+class Cargo(PyEnum):
+    ADMIN = "ADMIN"
+    FUNCIONARIO = "FUNCIONARIO"
+
+class Funcionario(Base):
+    __tablename__ = "funcionarios"
+
+    id = Column(Integer, primary_key=True)
+
+    nome = Column(String(150), nullable=False)
+
+    email = Column(
+        String(150),
+        nullable=False,
+        unique=True
+    )
+
+    telefone = Column(String(11), nullable=True)
+
+    cpf = Column(
+        String(11),
+        nullable=False,
+        unique=True
+    )
+
+    cargo = Column(
+        Enum(Cargo, name="cargo_funcionario"),
+        nullable=False,
+        default=Cargo.FUNCIONARIO
+    )
+
+    senha_hash = Column(String(255), nullable=False)
+
 class TipoMovimentacao(PyEnum):
     ENTRADA = "ENTRADA"
     SAIDA = "SAIDA"
@@ -72,6 +105,7 @@ class Lote(Base):
 
     id = Column(Integer, primary_key=True)
     produto_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    fornecedor_id = Column(Integer, ForeignKey('fornecedores.id'), nullable=False)
     numero_lote = Column(String(50), nullable=False)
     quantidade = Column(Integer, nullable=False)
     data_fabricacao = Column(Date, nullable=True)
@@ -84,6 +118,7 @@ class Lote(Base):
     )
 
     produto = relationship("Produto", back_populates="lotes")
+    fornecedor = relationship("Fornecedor")
     movimentacoes = relationship("Movimentacao", back_populates="lote", cascade="all, delete-orphan")
 
 class Movimentacao(Base):
