@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { API_URL } from '../config';
+import { apiRequest } from '../services/AuthService';
 
 interface Categoria { id: number; nome: string; }
 interface Fornecedor { id: number; nome: string; contato?: string; telefone?: string; email?: string; }
@@ -14,16 +14,7 @@ interface Lote {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail ?? `Erro ${response.status} ao acessar ${path}`);
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json();
+  return apiRequest<T>(path, options);
 }
 
 export default function CadastrosPage() {
