@@ -46,9 +46,9 @@ O professor também estabeleceu dois Design Patterns obrigatórios: Observer e F
 | 1 | US-01 | 🔴 ALTA | Como Funcionário, quero gerenciar os produtos em estoque do supermercado, podendo realizar a reposição ou diminuição do estoque de cada um. | 1 | ✔️ |
 | 2 | US-02 | 🔴 ALTA | Como Funcionário, quero acessar uma área de alertas que me avisam sobre estados específicos de certos produtos, como produto próximo da validade ou em baixo estoque. | 1 | ✔️ |
 | 3 | US-03 | 🟡 BAIXA | Como Funcionário, quero que o sistema calcule automaticamente promoções de produtos perto do vencimento. | 1 | ✔️ |
-| 4 | US-04 | 🟠 MÉDIA | Como Funcionário, quero possuir um histórico completo de auditagem de movimentações de produtos no estoque. | 2 | Não concluída |
-| 5 | US-05 | 🟠 MÉDIA | Como Funcionário, quero cadastrar informações secundárias sobre os produtos, como fornecedores, lotes e novas categorias. | 2 | Não concluída |
-| 6 | US-06 | 🟠 MÉDIA | Como Administrador, quero cadastrar os funcionários que terão acesso ao sistema. | 2 | Não concluída |
+| 4 | US-04 | 🟠 MÉDIA | Como Funcionário, quero possuir um histórico completo de auditagem de movimentações de produtos no estoque. | 2 | ✔️ |
+| 5 | US-05 | 🟠 MÉDIA | Como Funcionário, quero cadastrar informações secundárias sobre os produtos, como fornecedores, lotes e novas categorias. | 2 | ✔️ |
+| 6 | US-06 | 🟠 MÉDIA | Como Administrador, quero cadastrar os funcionários que terão acesso ao sistema. | 2 | ✔️ |
 
 
 ---
